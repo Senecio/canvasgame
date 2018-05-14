@@ -1,5 +1,5 @@
 /*
-    server websocket framework.
+    simple http server.
 */
 
 var express = require('express');
@@ -15,8 +15,3 @@ var port = 80;
 http.listen( port, function() {
     console.log('[DEBUG] Listening on *:' + port);
 });
-
-//app.get('/', function (req, res) {
-//    console.log(req);
-//    res.sendFile( '/front/index.html' , { root:__dirname });
-//});

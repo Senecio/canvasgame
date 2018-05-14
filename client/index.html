@@ -2,13 +2,22 @@
 <html><head>
   <title>WebGL Path Tracing</title>
   <style type="text/css">
+    *{ margin: 0; border: 0; padding: 0;}
   </style>
 </head>
-<body>
-    <div id="candiv" style="margin: 0px auto; width: 460px;"><canvas id="nes_screen" width="230" height="460"/></div>
-</body>
+<body onload="start()">
+    <div id="candiv" style="margin: 0px auto;"><canvas id="nes_screen"></canvas></div>
     <script type="text/javascript">
         canvas = document.getElementById('nes_screen');
+        var halfH = (window.innerHeight / 2) | 0;
+        canvas.height = halfH;
+        canvas.width = (halfH / 2) | 0;
+        var div = document.getElementById('candiv');
+        div.style['width'] = halfH + "px";
+        function start() {
+            // do something
+        }
     </script>
     <script type="text/javascript" src="bundle.js"></script>
+</body>
 </html>
