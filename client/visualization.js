@@ -1,7 +1,7 @@
 
 var THREE = require('./libs/three.min.js');
 
-var wallTex = new THREE.TextureLoader().load( './images/wall.jpg' );
+var wallTex = new THREE.TextureLoader().load('./images/wall.jpg');
 var floorTex = new THREE.TextureLoader().load('./images/floor.jpg');
 var boxTex = new THREE.TextureLoader().load('./images/box.jpg');
 
@@ -9,16 +9,17 @@ var planeMaterial = new THREE.MeshBasicMaterial({ color: 0xccccff, map: floorTex
 
 var boxGeometry = new THREE.BoxGeometry(1, 1, 1);
 var boxMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, map: boxTex });
+var boxMaterialSelected = new THREE.MeshBasicMaterial({ color: 0xff0000, map: boxTex });
 var wallMaterial = new THREE.MeshBasicMaterial({ color: 0xdddddd, map: wallTex });
 
 function Scene(canvas, objectMng) {
     //渲染器
     var ctx = canvas.getContext('webgl');
-    var renderer = new THREE.WebGLRenderer({ context: ctx});
+    var renderer = new THREE.WebGLRenderer({ context: ctx });
     //设置渲染器的高度和宽度，如果加上第三个值 false，则按场景大小显示，等比例缩放  
     renderer.setSize(canvas.width, canvas.height, false);
     var barHeight = 30;
-    renderer.setViewport(0, barHeight, canvas.width, canvas.height - 2 * barHeight);  
+    renderer.setViewport(0, barHeight, canvas.width, canvas.height - 2 * barHeight);
     renderer.setClearColor(new THREE.Color("rgb(255, 0, 0)"));
     renderer.antialias = true;
 
@@ -48,6 +49,9 @@ function Scene(canvas, objectMng) {
     var scene = new THREE.Scene();
     this.objectMng = objectMng;
 
+    this.intersectionBoxList = [];
+    this.intersectedBox = null;
+
     // 地板
     var plane = objectMng.GetPlane();
     scene.add(Plane(plane.size.width, plane.size.height));
@@ -63,12 +67,14 @@ function Scene(canvas, objectMng) {
         box = boxList[i];
         mesh = Box(box.position.x, box.position.z, box);
         scene.add(mesh);
+        this.intersectionBoxList.push(mesh);
     }
 
-    scene.fog= new THREE.Fog(0x000000,0.015,100)
+    scene.fog = new THREE.Fog(0x000000, 0.015, 100);
+    this.raycaster = new THREE.Raycaster();
 
     this.Render = function () {
-          renderer.render(scene, camera);
+        renderer.render(scene, camera);
     }
 
     this.SetCameraDistance = function (scale) {
@@ -78,10 +84,60 @@ function Scene(canvas, objectMng) {
         camera.position.x = -distance * Math.cos(pitch);
         self.cameraDistance = distance;
     }
+
+    this.DoIntersection = function (mouse) {
+        var raycaster = this.raycaster;
+        raycaster.setFromCamera(mouse, camera);
+
+        //console.log(mouse.leftButton.status, mouse.leftButton.event);
+        //console.log(mouse.middleButton.event)
+        //console.log(mouse.rightButton.event)
+
+        if (mouse.leftButton.status && mouse.leftButton.event === "down") {
+            intersectedBox = this.intersectedBox;
+            var intersects = raycaster.intersectObjects(this.intersectionBoxList);
+            if (intersects.length > 0) {
+
+                for (let i = 0; i < intersects.length; ++i) {
+                    intersects[i].object._touchBegin = true;
+                    intersects[i].object.attachInfo.target.event.Emit('touchBegin');
+                }
+
+            }
+
+            //     if ( intersectedBox != intersects[0].object ) {
+            //         if ( intersectedBox ) intersectedBox.attachInfo.target.event.Emit('rayUnintersected');
+            //         intersectedBox = intersects[0].object;
+            //         intersectedBox.attachInfo.target.event.Emit('rayIntersected');
+            //     }
+            // } else {
+            //     if ( intersectedBox ) intersectedBox.attachInfo.target.event.Emit('rayUnintersected');
+            //     intersectedBox = null;
+            // }
+            // this.intersectedBox = intersectedBox;
+        }
+
+        if (mouse.leftButton.status && mouse.moving) {
+            var intersects = this.intersectionBoxList;
+            for (let i = 0; i < intersects.length; ++i) {
+                intersects[i].attachInfo.target.event.Emit('touchMove');
+            }
+        }
+
+        if (!mouse.leftButton.status && mouse.leftButton.event === "up") {
+            var intersects = this.intersectionBoxList;
+            for (let i = 0; i < intersects.length; ++i) {
+                if (intersects[i]._touchBegin) {
+                    intersects[i]._touchBegin = false;
+                    intersects[i].attachInfo.target.event.Emit('touchUp');
+                }
+            }
+        }
+    }
 }
 
-function Plane(width, height) { 
-    var geometry = new THREE.BoxGeometry(width+2, 0.01, height+2);
+function Plane(width, height) {
+    var geometry = new THREE.BoxGeometry(width + 2, 0.01, height + 2);
     var mesh = new THREE.Mesh(geometry, planeMaterial);
     mesh.position.x = 0;
     mesh.position.z = 0;
@@ -106,19 +162,30 @@ function Box(x, y, box) {
     mesh.position.y = 0.5;
 
     var attachInfo = {
-        "Link": function(mesh, box) {
+        "Link": function (mesh, box) {
             if (!this.linked) {
                 this.onwer = mesh;
                 this.target = box;
-                this.changePositionCB = function() {
+                this.changePositionCB = function () {
                     this.onwer.position.x = this.target.position.x;
                     this.onwer.position.z = this.target.position.z;
                 }.bind(this);
                 this.target.event.Add('changePosition', this.changePositionCB);
+
+                this.SelectedCB = function () {
+                    this.onwer.material = boxMaterialSelected;
+                }.bind(this);
+                this.target.event.Add('selected', this.SelectedCB);
+
+                this.UnselectedCB = function () {
+                    this.onwer.material = boxMaterial;
+                }.bind(this);
+                this.target.event.Add('unselected', this.UnselectedCB);
+
             }
             this.linked = true;
         },
-        "Dislink": function() {
+        "Dislink": function () {
             if (this.linked) {
                 this.target.event.Remove('changePosition', this.changePositionCB);
                 this.target = undefined;

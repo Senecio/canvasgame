@@ -3,16 +3,87 @@ var GameObject = require('./gameObject');
 var ObjectManager = GameObject.ObjectManager;
 var Visulization = require('./visualization');
 
-console.log(window.innerWidth , window.innerHeight);
+console.log(window.innerWidth, window.innerHeight);
 canvas.width *= 2;
 canvas.height *= 2;
 
-function DoLogic() {
 
+function Init() {
+
+    this.mouse = {
+        leftButton: { status: 0, event: "" },
+        middleButton: { status: 0, event: "" },
+        rightButton: { status: 0, event: "" },
+        moving: false,
+    };
+    var mouse = this.mouse;
+
+    canvas.addEventListener('mousedown', onCanvasMouseDown, false);
+    canvas.addEventListener('mousemove', onCanvasMouseMove, false);
+    canvas.addEventListener('mouseup', onCanvasMouseUp, false);
+
+    function onCanvasMouseDown(event) {
+        if (event.button === 0) {
+            mouse.leftButton.status = 1;
+            mouse.leftButton.event = "down";
+        } else if (event.button === 1) {
+            mouse.middleButton = 1;
+            mouse.middleButton.event = "down";
+        } else if (event.button === 2) {
+            mouse.rightButton = 1;
+            mouse.rightButton.event = "down";
+        }
+    }
+
+    function onCanvasMouseMove(event) {
+        //获取鼠标指针坐标
+        function getMousePos(canvas, evt) {
+            var rect = canvas.getBoundingClientRect();
+            return {
+                x: evt.clientX - rect.left,
+                y: evt.clientY - rect.top
+            };
+        }
+        event.preventDefault();
+        var pos = getMousePos(canvas, event);
+        mouse.x = (pos.x / canvas.width) * 2 - 1;
+        mouse.y = - (pos.y / canvas.height) * 2 + 1;
+
+        mouse.moving = true;
+    }
+
+    function onCanvasMouseUp(event) {
+        if (event.button === 0) {
+            mouse.leftButton.status = 0;
+            mouse.leftButton.event = "up";
+        } else if (event.button === 1) {
+            mouse.middleButton.status = 0;
+            mouse.middleButton.event = "up";
+        } else if (event.button === 2) {
+            mouse.rightButton.status = 0;
+            mouse.rightButton.event = "up";
+        }
+    }
+
+    this.clearMouseEvent = function clearMouseEvent() {
+        mouse.leftButton.event = "";
+        mouse.middleButton.event = "";
+        mouse.rightButton.event = "";
+
+        mouse.moving = false;
+    }
+}
+
+function DoLogic() {
+    this.visulization.DoIntersection(this.mouse);
 }
 
 function Draw() {
     this.visulization.Render();
+}
+
+function FrameEnd() {
+    this.clearMouseEvent();
 }
 
 function LoadMap() {
@@ -21,7 +92,7 @@ function LoadMap() {
     this.objectMng.Generate(map1);
     this.visulization = new Visulization(canvas, this.objectMng);
 
-    this.objectMng.GetBoxList()[0].SetPosition(0,0,0);
+    //this.objectMng.GetBoxList()[0].SetPosition(0,0,0);
 
     /*
     this.touchCmd = "none";
@@ -71,18 +142,23 @@ function LoadMap() {
 }
 
 function Game() {
+    this.Init = Init.bind(this);
     this.DoLogic = DoLogic.bind(this);
     this.Draw = Draw.bind(this);
     this.LoadMap = LoadMap.bind(this);
+    this.FrameEnd = FrameEnd.bind(this);
 }
 
 var game = new Game();
+game.Init();
 game.LoadMap();
 
-var mainLoop = function() {
+var mainLoop = function () {
 
     game.DoLogic();
     game.Draw();
+
+    game.FrameEnd();
 
     requestAnimationFrame(mainLoop, canvas);
 }
